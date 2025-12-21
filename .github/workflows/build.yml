@@ -34,18 +34,18 @@ jobs:
         shell: bash
         run: |
           mkdir -p lib/secrets
-          cat > lib/secrets/fallback.dart<<'EOF'
+          cat > lib/secrets/fallback.dart << 'EOF'
           const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';
           EOF
 
       - name: 📝 获取版本号
         id: version
         run: |
-          VERSION=$(grep'version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
+          VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
           echo "VERSION=\(VERSION" >> \)GITHUB_ENV
           echo "版本号: $VERSION"
 
-      - name: 🔑 配置签名
+      - name:🔑 配置签名
         run: |
           if [ -n "${{ secrets.SIGN_KEYSTORE_BASE64 }}" ]; then
             echo "使用主人提供的签名"
