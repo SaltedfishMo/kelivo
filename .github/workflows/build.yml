@@ -12,12 +12,12 @@ jobs:
     permissions: write-all
 
     steps:
-      - name:📦 检出代码
+      - name: 📦 检出代码
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name:☕ 配置 Java 环境
+      - name: ☕ 配置 Java 环境
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
@@ -84,10 +84,3 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Android-armeabi-v7a
-          path: build/app/outputs/flutter-apk/Kelivo_android_*_armeabi-v7a.apk
-
-      - name: 📤 上传 x86_64
-        uses: actions/upload-artifact@v4
-        with:
-          name: Android-x86_64
-          path: build/app/outputs/flutter-apk/Kelivo_android_*_x86_64.apk
