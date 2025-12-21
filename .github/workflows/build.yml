@@ -12,7 +12,7 @@ jobs:
     permissions: write-all
 
     steps:
-      - name: 📦 检出代码
+      - name:📦 检出代码
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -45,7 +45,7 @@ jobs:
           echo "VERSION=\(VERSION" >> \)GITHUB_ENV
           echo "版本号: $VERSION"
 
-      - name:🔑 配置签名
+      - name: 🔑 配置签名
         run: |
           if [ -n "${{ secrets.SIGN_KEYSTORE_BASE64 }}" ]; then
             echo "使用主人提供的签名"
