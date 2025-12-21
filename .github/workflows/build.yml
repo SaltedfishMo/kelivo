@@ -70,17 +70,11 @@ jobs:
       - name: 📦 重命名 APK
         run: |
           cd build/app/outputs/flutter-apk
+          # 仅处理主人需要的 arm64 版本
           mv app-arm64-v8a-release.apk Kelivo_android_${VERSION}_arm64-v8a.apk
-          mv app-armeabi-v7a-release.apk Kelivo_android_${VERSION}_armeabi-v7a.apk
-          mv app-x86_64-release.apk Kelivo_android_${VERSION}_x86_64.apk
 
       - name: 📤 上传 arm64-v8a
         uses: actions/upload-artifact@v4
         with:
           name: Android-arm64-v8a
           path: build/app/outputs/flutter-apk/Kelivo_android_*_arm64-v8a.apk
-
-      - name: 📤 上传 armeabi-v7a
-        uses: actions/upload-artifact@v4
-        with:
-          name: Android-armeabi-v7a
