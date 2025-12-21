@@ -1,210 +1,113 @@
-name: Flutter Multi-Platform Build (Alice Fork)
-
-env:
-  FLUTTER_CHANNEL: 'master'
+name: Flutter Build (Alice Ultra-Safe Edition)
 
 on:
-  # 监听代码推送，自动干活！
   push:
     branches: [ "main", "master" ]
-  # 保留手动触发按钮
   workflow_dispatch:
-    inputs:
-      build_android:
-        description: '构建 Android'
-        required: false
-        default: true # 默认开启
-        type: boolean
-      build_windows:
-        description: '构建 Windows'
-        required: false
-        default: true
-        type: boolean
-      build_linux:
-        description: '构建 Linux'
-        required: false
-        default: true # Linux构建通常很快，开着也没事
-        type: boolean
-      #以此类推，为了节省主人的Action额度，iOS/Mac默认关掉（如果是为了玩，通常安卓/Win够了）
-      build_ios:
-        description: '构建 iOS (消耗Action额度快)'
-        required: false
-        default: false 
-        type: boolean
-      build_mac:
-        description: '构建 macOS (消耗Action额度快)'
-        required: false
-        default: false
-        type: boolean
 
 jobs:
-  # Android 构建 (已修复签名问题)
   android:
-    if: ${{ github.event_name == 'push' || github.event.inputs.build_android == 'true' }}
     name: 构建 Android
     runs-on: ubuntu-latest
     permissions: write-all
-
+    
     steps:
-      - name: 📦 检出代码
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: ☕ 配置 Java 环境
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
           cache: 'gradle'
-
-      - name: 🐦 安装 Flutter (Master)
-        uses: subosito/flutter-action@v2
-        with:
-          channel: master
-          cache: true
-
-      - name: 📝 注入 API Key (Fallback)
-        shell: bash
-        run: |
-          mkdir -p lib/secrets
-          # 如果主人没配 Secret，这里就是一个空字符串，不会报错
-          cat > lib/secrets/fallback.dart <<EOF
-          const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';
-          EOF
-
-      - name: 📝 获取版本号
-        id: version
-        run: |
-          VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
-          echo "VERSION=\(VERSION" >> \)GITHUB_ENV
-          echo "版本号: $VERSION"
-
-      # ✨ 爱丽丝的魔法：如果没有原作者密钥，就现场生成一个！
-      - name: 🔑 处理签名配置
-        run: |
-          if [ -n "${{ secrets.SIGN_KEYSTORE_BASE64 }}" ]; then
-            echo "检测到主人的私钥，正在解码..."
-            echo "${{ secrets.SIGN_KEYSTORE_BASE64 }}" | base64 --decode > android/app/key.jks
-            echo "storeFile=key.jks" >> android/key.properties
-            echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/key.properties
-            echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
-            echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
-          else
-            echo "⚠️ 未检测到私钥，爱丽丝正在生成临时自签名证书..."
-            # 生成一个临时的 keystore
-            keytool -genkey -v -keystore android/app/key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias key -storepass 123456 -keypass 123456 -dname "CN=AliceBuild,O=AliceCorp,C=CN"
-            # 写入配置让 gradle 开心
-            echo "storeFile=key.jks" > android/key.properties
-            echo "storePassword=123456" >> android/key.properties
-            echo "keyAlias=key" >> android/key.properties
-            echo "keyPassword=123456" >> android/key.properties
-          fi
-          echo "✅ 签名配置完成！"
-
-      - name: 🏗️ 构建 APK (Release)
-        run: flutter build apk --release --split-per-abi
-
-      - name: 📦 重命名 APK
-        run: |
-          cd build/app/outputs/flutter-apk
-          for file in app-*-release.apk; do
-            abi=\((echo "\)file" | sed -E 's/app-(.*)-release\.apk/\1/')
-            mv "\(file" "Kelivo_android_\){VERSION}_${abi}.apk"
-          done
-
-      # 这一步只在真正 Release 时跑，平时 Push 我们只需要上传产物
-      - name: 🚀 发布到 Release (仅在打标签时)
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: build/app/outputs/flutter-apk/Kelivo_android_*.apk
-
-      # 无论如何都把文件传上来给主人下载
-      - name: 📤 上传构建产物 (arm64-v8a)
-        uses: actions/upload-artifact@v4
-        with:
-          name: Android-arm64-v8a
-          path: build/app/outputs/flutter-apk/Kelivo_android_*_arm64-v8a.apk
-
-  # Windows 构建
-  windows:
-    if: ${{ github.event_name == 'push' || github.event.inputs.build_windows == 'true' }}
-    name: 构建 Windows
-    runs-on: windows-latest
-    permissions: write-all
-
-    steps:
-      - name: 📦 检出代码
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: 🔧 安装最新 CMake
-        uses: lukka/get-cmake@latest
-
-      - name: 🐦 安装 Flutter (Master)
-        uses: subosito/flutter-action@v2
-        with:
-          channel: master
-          cache: true
-
-      - name: 📝 注入 API Key
-        shell: bash
-        run: |
-          mkdir -p lib/secrets
-          cat > lib/secrets/fallback.dart <<EOF
-          const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';
-          EOF
-
-      - name: 🔧 获取依赖
-        run: flutter pub get
-
-      - name: 📝 获取版本号
-        shell: pwsh
-        run: |
-          \(version = (Select-String -Path pubspec.yaml -Pattern "version:" | ForEach-Object { \)_.Line.Split(":")[1].Trim() })
-          echo "VERSION=\(version" >> \)env:GITHUB_ENV
-
-      - name: 🏗️ 构建 Windows
-        run: flutter build windows --release
-
-      - name: 📦 打包 ZIP
-        shell: pwsh
-        run: |
-          Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "Kelivo_windows_$env:VERSION.zip"
-
-      - name: 📤 上传构建产物 (ZIP)
-        uses: actions/upload-artifact@v4
-        with:
-          name: Windows-ZIP
-          path: Kelivo_windows_*.zip
       
-      # 注：为了加快速度，我暂时移除了 Inno Setup 制作安装包的步骤
-      # 这种 ZIP 包解压即用，也就是所谓的“绿色版”，对主人来说应该更方便！
-      # 如果主人一定要安装包 exe，告诉爱丽丝，我再加回来。
-
-  # Linux 构建 (保持原样，基本没问题)
-  linux:
-    if: ${{ github.event_name == 'push' || github.event.inputs.build_linux == 'true' }}
-    name: 构建 Linux
-    runs-on: ubuntu-latest
-    permissions: write-all
-    steps:
-      - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-good gstreamer1.0-plugins-bad rpm patchelf libfuse2 file libkeybinder-3.0-dev libayatana-appindicator3-dev
       - uses: subosito/flutter-action@v2
         with:
           channel: master
-      - run: |
+          cache: true
+      
+      - name: 注入 API Key
+        shell: bash
+        run: |
           mkdir -p lib/secrets
-          cat > lib/secrets/fallback.dart <<EOF
-          const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';
-          EOF
-      - run: flutter pub get
+          echo "const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';" > lib/secrets/fallback.dart
+      
+      - name: 生成临时签名
+        run: |
+          keytool -genkey -v -keystore android/app/upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload -storepass android -keypass android -dname "CN=Android,O=Build,C=US"echo "storeFile=upload.jks" > android/key.properties
+          echo "storePassword=android" >> android/key.properties
+          echo "keyAlias=upload" >> android/key.properties
+          echo "keyPassword=android" >> android/key.properties
+      
+      - name: 构建 APK
+        run: flutter build apk --release --split-per-abi
+      
+      - name: 上传 arm64 版本
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-arm64-v8a
+          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+      
+      - name: 上传 armeabi 版本
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-armeabi-v7a
+          path: build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+
+  windows:
+    name: 构建 Windows
+    runs-on: windows-latest
+    permissions: write-all
+    
+    steps:
+      - uses: actions/checkout@v4
+      - uses: lukka/get-cmake@latest
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: master
+          cache: true
+      
+      - name: 注入 API Key
+        shell: bash
+        run: |
+          mkdir -p lib/secrets
+          echo "const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';" > lib/secrets/fallback.dart
+      
+      - run: flutter build windows --release
+      
+      - name: 打包
+        shell: pwsh
+        run: Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "Kelivo-Windows.zip"
+      
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Windows-Build
+          path: Kelivo-Windows.zip
+
+  linux:
+    name: 构建 Linux
+    runs-on: ubuntu-latest
+    permissions: write-all
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
+      
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: master
+      - name: 注入 API Key
+        run: |
+          mkdir -p lib/secrets
+          echo "const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';" > lib/secrets/fallback.dart
+      
       - run: flutter build linux --release
-      - run: cd build/linux/x64/release/bundle && tar -czf Kelivo_linux.tar.gz .
+      
+      - name: 打包
+        run: |
+          cd build/linux/x64/release
+          tar -czf ../../../../Kelivo-Linux.tar.gz bundle
       - uses: actions/upload-artifact@v4
         with:
           name: Linux-Build
-          path: build/linux/x64/release/bundle/Kelivo_linux.tar.gz
+          path: Kelivo-Linux.tar.gz
